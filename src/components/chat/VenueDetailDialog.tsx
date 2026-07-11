@@ -46,6 +46,14 @@ export function VenueDetailDialog({
         outlets: { confidenceScore: 100, upvotes: 6, downvotes: 0 },
     });
 
+    // Tab and dynamic content states
+    const [activeTab, setActiveTab] = useState<"overview" | "reviews" | "menu">("overview");
+    const [reviews, setReviews] = useState<any[]>([]);
+    const [menuPhotos, setMenuPhotos] = useState<string[]>([]);
+    const [uploadingMenu, setUploadingMenu] = useState(false);
+    const [previewPhoto, setPreviewPhoto] = useState<string | null>(null);
+    const [wifiPredictions, setWifiPredictions] = useState<any[]>([]);
+
     const _submitAmenityVote = async (amenityKey: "wifi" | "outlets", isUpvote: boolean) => {
         if (!venue) return;
         try {
@@ -85,6 +93,8 @@ export function VenueDetailDialog({
         });
     }, [venue]);
 
+    useEffect(() => {
+        if (!venue) return;
         setLiveScore(venue.score ?? null);
         setPhotoLoading(true);
         setActiveTab("overview");
@@ -309,6 +319,7 @@ export function VenueDetailDialog({
                     {photoLoading ? (
                         <div className="w-full h-full bg-zinc-100 dark:bg-zinc-800 animate-pulse" />
                     ) : (
+                        /* eslint-disable-next-line @next/next/no-img-element */
                         <img
                             src={displayPhoto}
                             alt={venue.name}
@@ -501,7 +512,7 @@ export function VenueDetailDialog({
                                     <p className="text-[10px] text-zinc-400 mt-1">Be the first to share your workspace rating.</p>
                                 </div>
                             ) : (
-                                reviews.map((review, idx) => (
+                                reviews.map((review: any, idx: number) => (
                                     <div key={idx} className="p-4 border border-zinc-100 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/20 rounded-2xl space-y-3">
                                         <div className="flex justify-between items-start">
                                             <div>
@@ -564,7 +575,7 @@ export function VenueDetailDialog({
                                 <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest py-8 rounded-2xl border-2 border-dashed border-zinc-100 dark:border-zinc-800 text-center animate-pulse">No menu photos added yet</p>
                             ) : (
                                 <div className="grid grid-cols-2 gap-4">
-                                    {menuPhotos.map((photo, i) => (
+                                    {menuPhotos.map((photo: string, i: number) => (
                                         <div key={i} className="relative h-32 rounded-xl overflow-hidden border border-zinc-100 dark:border-zinc-800 group/item cursor-pointer" onClick={() => setPreviewPhoto(photo)}>
                                             {/* eslint-disable-next-line @next/next/no-img-element */}
                                             <img src={photo} alt={`Menu ${i+1}`} className="w-full h-full object-cover transition-transform group-hover/item:scale-105 duration-300" />

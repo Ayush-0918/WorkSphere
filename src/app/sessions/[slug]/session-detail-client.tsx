@@ -172,6 +172,7 @@ export default function SessionDetailClient({ session }: Props) {
                   return (
                     <div key={item.user.id} className="flex items-center gap-3">
                       {item.user.imageUrl ? (
+                        /* eslint-disable-next-line @next/next/no-img-element */
                         <img 
                           src={item.user.imageUrl} 
                           alt={name} 

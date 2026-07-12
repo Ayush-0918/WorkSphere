@@ -30,13 +30,16 @@ export async function GET(req: NextRequest) {
       hasPhoneBooths: searchParams.get("hasPhoneBooths"),
       hasNoMusic: searchParams.get("hasNoMusic"),
       hasQuietZone: searchParams.get("hasQuietZone"),
+      petsAllowedIndoors: searchParams.get("petsAllowedIndoors"),
+      patioOnly: searchParams.get("patioOnly"),
+      waterBowlsProvided: searchParams.get("waterBowlsProvided"),
     });
 
     if (!validation.success) {
       return NextResponse.json({ error: validation.error }, { status: 400 });
     }
 
-    const { lat, lng, radius, category, wifi, outlets, quiet, ergonomic, outletDensity, wifiSpeedBand, hasPhoneBooths, hasNoMusic, hasQuietZone } = validation.data;
+    const { lat, lng, radius, category, wifi, outlets, quiet, ergonomic, outletDensity, wifiSpeedBand, hasPhoneBooths, hasNoMusic, hasQuietZone, petsAllowedIndoors, patioOnly, waterBowlsProvided } = validation.data;
 
     // Simple bounding box search (for PostgreSQL without PostGIS)
     // Approximate: 1 degree ≈ 111km
@@ -105,6 +108,17 @@ export async function GET(req: NextRequest) {
     if (hasQuietZone) {
       where.hasQuietZone = true;
     }
+    if (petsAllowedIndoors) {
+      where.petsAllowedIndoors = true;
+    }
+
+    if (patioOnly) {
+      where.patioOnly = true;
+    }
+
+    if (waterBowlsProvided) {
+      where.waterBowlsProvided = true;
+    }
 
     const venues = await prisma.venue.findMany({
       where,
@@ -142,7 +156,7 @@ export async function POST(req: NextRequest) {
     if (!validation.success) {
       return NextResponse.json({ error: validation.error }, { status: 400 });
     }
-    const { name, latitude, longitude, category, address, wifiQuality, hasOutlets, noiseLevel, hasErgonomic, outletDensity, wifiSpeed, hasPhoneBooths, hasNoMusic, hasQuietZone } = validation.data;
+    const { name, latitude, longitude, category, address, wifiQuality, hasOutlets, noiseLevel, hasErgonomic, outletDensity, wifiSpeed, hasPhoneBooths, hasNoMusic, hasQuietZone, petsAllowedIndoors, patioOnly, waterBowlsProvided } = validation.data;
     const { placeId, rating, imageUrl } = body; // placeId, rating, imageUrl are additional fields
 
     // Validate placeId (required for upsert)
@@ -184,6 +198,9 @@ export async function POST(req: NextRequest) {
         hasPhoneBooths,
         hasNoMusic,
         hasQuietZone,
+        petsAllowedIndoors,
+        patioOnly,
+        waterBowlsProvided,
         crowdsourced: true,
         requiresReview,
         ...(imageUrl && { imageUrl }),
@@ -205,6 +222,9 @@ export async function POST(req: NextRequest) {
         hasPhoneBooths: hasPhoneBooths || false,
         hasNoMusic: hasNoMusic || false,
         hasQuietZone: hasQuietZone || false,
+        petsAllowedIndoors: petsAllowedIndoors || false,
+        patioOnly: patioOnly || false,
+        waterBowlsProvided: waterBowlsProvided || false,
         crowdsourced: true,
         requiresReview,
         imageUrl,

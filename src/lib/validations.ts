@@ -30,6 +30,9 @@ export const venueSearchSchema = z.object({
   hasPhoneBooths: z.coerce.boolean().optional(),
   hasNoMusic: z.coerce.boolean().optional(),
   hasQuietZone: z.coerce.boolean().optional(),
+  petsAllowedIndoors: z.coerce.boolean().optional(),
+  patioOnly: z.coerce.boolean().optional(),
+  waterBowlsProvided: z.coerce.boolean().optional(),
 });
 
 export const venueCreateSchema = z.object({
@@ -47,6 +50,9 @@ export const venueCreateSchema = z.object({
   hasPhoneBooths: z.boolean().optional(),
   hasNoMusic: z.boolean().optional(),
   hasQuietZone: z.boolean().optional(),
+  petsAllowedIndoors: z.boolean().optional(),
+  patioOnly: z.boolean().optional(),
+  waterBowlsProvided: z.boolean().optional(),
 });
 
 export const venueRatingSchema = z.object({
@@ -63,6 +69,9 @@ export const venueRatingSchema = z.object({
   hasPhoneBooths: z.boolean().optional().default(false),
   hasNoMusic: z.boolean().optional().default(false),
   hasQuietZone: z.boolean().optional().default(false),
+  petsAllowedIndoors: z.boolean().optional().default(false),
+  patioOnly: z.boolean().optional().default(false),
+  waterBowlsProvided: z.boolean().optional().default(false),
 });
 
 // Conversation schemas

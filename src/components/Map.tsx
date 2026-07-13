@@ -225,8 +225,8 @@ const Map = ({
   // =========================================================================
   const [routingQueue, setRoutingQueue] = useState<any[]>([]);
   const [optimizedRoute, setOptimizedRoute] = useState<any>(null);
-  const [travelProfile, setTravelProfile] = useState<"foot" | "bike" | "car">(
-    "foot",
+  const [travelProfile, setTravelProfile] = useState<"walking" | "cycling" | "driving">(
+    "walking",
   );
 
   // OSRM Multi-Stop coordinate solver engine
@@ -257,11 +257,11 @@ const Map = ({
       .join(";");
 
     const osrmProfile =
-      travelProfile === "foot"
+      travelProfile === "walking"
         ? "foot"
-        : travelProfile === "bike"
+        : travelProfile === "cycling"
           ? "bicycle"
-          : "car";
+          : "driving";
     const url = `https://router.project-osrm.org/route/v1/${osrmProfile}/${coordinatesString}?overview=full&geometries=geojson&steps=true`;
 
     try {
@@ -655,7 +655,7 @@ const Map = ({
                 opacity: 0.9,
                 lineCap: "round",
                 lineJoin: "round",
-                dashArray: travelProfile === "foot" ? "5, 10" : undefined, // Dotted path line if walking
+                dashArray: travelProfile === "walking" ? "5, 10" : undefined, // Dotted path line if walking
               }}
             >
               <Popup>
@@ -736,7 +736,7 @@ const Map = ({
 
           {/* Travel Mode Selectors */}
           <div className="mb-4 grid grid-cols-3 gap-1 rounded-lg bg-zinc-900 p-1 text-xs">
-            {(["foot", "bike", "car"] as const).map((mode) => (
+            {(["walking", "cycling", "driving"] as const).map((mode) => (
               <button
                 key={mode}
                 onClick={() => setTravelProfile(mode)}
@@ -746,9 +746,9 @@ const Map = ({
                     : "text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
                 }`}
               >
-                {mode === "foot"
+                {mode === "walking"
                   ? "🚶‍♂️ Walk"
-                  : mode === "bike"
+                  : mode === "cycling"
                     ? "🚴‍♂️ Bike"
                     : "🚗 Drive"}
               </button>

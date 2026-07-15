@@ -120,8 +120,16 @@ export function EnhancedChatbot({
 
   // Presence state
   const [cursors, setCursors] = useState<
-    Record<string, { x: number; y: number; name: string }>
-  >({});
+  Record<
+    string,
+    {
+      x: number;
+      y: number;
+      name: string;
+      avatar: string;
+    }
+  >
+>({});
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
 
   // Core state
@@ -153,6 +161,11 @@ export function EnhancedChatbot({
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
 
   // Track local cursor
+    const guestAvatar =
+      typeof window !== "undefined"
+        ? localStorage.getItem("guest-avatar") || "😀"
+        : "😀";
+    if (!socket || !roomId) return;
   useEffect(() => {
     if (!socket || !roomId) return;
 
@@ -184,7 +197,7 @@ export function EnhancedChatbot({
         if (data.type === "cursor") {
           setCursors((prev) => ({
             ...prev,
-            [data.name]: { x: data.x, y: data.y, name: data.name },
+            [data.name]: { x: data.x, y: data.y, name: data.name, avatar: data.avatar || "🟢" },
           }));
         } else if (data.type === "typing") {
           setTypingUsers((prev) => {
@@ -880,8 +893,14 @@ export function EnhancedChatbot({
         const finalMsg = prev.find((m) => m.id === assistantMessageId);
         if (finalMsg && socket && roomId) {
           socket.send(
-            JSON.stringify({ type: "new-message", message: finalMsg }),
-          );
+            JSON.stringify({
+              type: "cursor",
+              x: e.clientX,
+              y: e.clientY,
+    name: user?.firstName || "Anonymous",
+    avatar: isSignedIn ? "👤" : guestAvatar,
+  }),
+);
         }
         return prev;
       });
@@ -995,8 +1014,9 @@ export function EnhancedChatbot({
                 fill="currentColor"
               />
             </svg>
-            <div className="bg-orange-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full ml-4 shadow-md whitespace-nowrap">
-              {cursor.name}
+            <div className="bg-orange-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full ml-4 shadow-md whitespace-nowrap flex items-center gap-1">
+              <span>{cursor.avatar}</span>
+              <span>{cursor.name}</span>
             </div>
           </motion.div>
         ))}

@@ -25,6 +25,17 @@ let totalQueryCount = 0;
 
 // ─── Redis Setup ─────────────────────────────────────────────────────────────
 let cachedRedis: Redis | null = null;
+let nextServerAfter: typeof import("next/server").after | null = null;
+
+if (typeof window === "undefined") {
+  import("next/server")
+    .then(({ after }) => {
+      nextServerAfter = after;
+    })
+    .catch(() => {
+      // Ignored: outside of Next.js server environment
+    });
+}
 
 function getRedis(): Redis | null {
   if (cachedRedis) return cachedRedis;
@@ -40,6 +51,7 @@ function getRedis(): Redis | null {
     cachedRedis = new Redis({
       url: process.env.UPSTASH_REDIS_REST_URL,
       token: process.env.UPSTASH_REDIS_REST_TOKEN,
+      retry: false, // Disable automatic retries for telemetry writes
     });
   } catch (error) {
     console.error("[dbTelemetry] Redis initialization failed:", error);
@@ -82,9 +94,20 @@ export function recordQueryDuration(model: string, durationMs: number) {
     pipeline.lpush(samplesKey, JSON.stringify(sample));
     pipeline.ltrim(samplesKey, 0, MAX_SAMPLES_PER_MODEL - 1);
 
-    pipeline.exec().catch((error) => {
-      console.error("[dbTelemetry] Redis write failed:", error);
-    });
+    const promise = pipeline
+      .exec({ signal: AbortSignal.timeout(2000) })
+      .catch((error) => {
+        console.error("[dbTelemetry] Redis write failed:", error);
+      });
+
+    // Request lifecycle integration for Next.js 15+ serverless environments
+    if (nextServerAfter) {
+      try {
+        nextServerAfter(() => promise);
+      } catch {
+        // Ignored: outside of request context
+      }
+    }
   }
 }
 
@@ -142,12 +165,16 @@ export async function getDbLatencyStats() {
       const globalKey = "worksphere:telemetry:global";
       const modelsKey = "worksphere:telemetry:models";
 
+      const timeoutSignal = AbortSignal.timeout(1500);
+
       const [globalStats, models] = await Promise.all([
-        redis.hgetall(globalKey) as Promise<Record<
+        redis.hgetall(globalKey, { signal: timeoutSignal }) as Promise<Record<
           string,
           string | number
         > | null>,
-        redis.smembers(modelsKey) as Promise<string[]>,
+        redis.smembers(modelsKey, { signal: timeoutSignal }) as Promise<
+          string[]
+        >,
       ]);
 
       const redisTotalQueryCount = globalStats
@@ -170,17 +197,17 @@ export async function getDbLatencyStats() {
         for (const model of models) {
           pipeline.lrange(`worksphere:telemetry:samples:${model}`, 0, -1);
         }
-        const samplesListsRaw = await pipeline.exec();
+        const samplesListsRaw = await pipeline.exec({ signal: timeoutSignal });
 
         for (let i = 0; i < models.length; i++) {
           const model = models[i];
-          const rawSamples = samplesListsRaw[i] as string[];
+          const rawSamples = samplesListsRaw[i] as any[];
           if (!rawSamples || rawSamples.length === 0) continue;
 
           const durations = rawSamples
             .map((s) => {
               try {
-                const parsed = JSON.parse(s);
+                const parsed = typeof s === "string" ? JSON.parse(s) : s;
                 return typeof parsed?.durationMs === "number"
                   ? parsed.durationMs
                   : null;

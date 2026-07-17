@@ -140,8 +140,14 @@ describe("Database Telemetry", () => {
 
       const stats = await dbTelemetry.getDbLatencyStats();
 
-      expect(mockHgetall).toHaveBeenCalledWith("worksphere:telemetry:global");
-      expect(mockSmembers).toHaveBeenCalledWith("worksphere:telemetry:models");
+      expect(mockHgetall).toHaveBeenCalledWith(
+        "worksphere:telemetry:global",
+        expect.any(Object),
+      );
+      expect(mockSmembers).toHaveBeenCalledWith(
+        "worksphere:telemetry:models",
+        expect.any(Object),
+      );
       expect(mockLrange).toHaveBeenCalledWith(
         "worksphere:telemetry:samples:Product",
         0,
@@ -156,6 +162,34 @@ describe("Database Telemetry", () => {
         model: "Product",
         avgMs: 200,
         p95Ms: 300,
+        sampleCount: 2,
+      });
+    });
+
+    it("should fetch db stats from Redis when it yields pre-deserialized objects (production behavior)", async () => {
+      mockHgetall.mockResolvedValue({
+        totalQueryCount: "5",
+        slowQueryCount: "1",
+      });
+      mockSmembers.mockResolvedValue(["Product"]);
+      // Return objects directly (automatic deserialization behavior)
+      mockExec.mockResolvedValue([
+        [
+          { durationMs: 120, timestamp: Date.now() },
+          { durationMs: 220, timestamp: Date.now() },
+        ],
+      ]);
+
+      const stats = await dbTelemetry.getDbLatencyStats();
+
+      expect(stats.totalQueryCount).toBe(5);
+      expect(stats.slowQueryCount).toBe(1);
+      expect(stats.avgMs).toBe(170);
+      expect(stats.p95Ms).toBe(220);
+      expect(stats.byModel).toContainEqual({
+        model: "Product",
+        avgMs: 170,
+        p95Ms: 220,
         sampleCount: 2,
       });
     });

@@ -24,8 +24,12 @@ export interface OfflineAction {
 let dbInstance: IDBDatabase | null = null;
 let dbPromise: Promise<IDBDatabase> | null = null;
 
-// Register the beforeunload cleanup exactly once per module load.
-// { once: true } prevents duplicate listeners on HMR reloads.
+// Register the beforeunload cleanup at module load time.
+// { once: true } auto-removes the listener after it fires, preventing it from
+// running on subsequent navigations in long-lived SPAs.  HMR reloads
+// re-execute this block and register a new listener each time, but the
+// operations (db.close() and null assignments) are idempotent so duplicate
+// registrations are harmless.
 if (typeof window !== "undefined") {
   window.addEventListener(
     "beforeunload",
@@ -84,6 +88,7 @@ function getDB(): Promise<IDBDatabase> {
       };
 
       dbInstance = db;
+      dbPromise = null; // opening is complete; dbInstance is now the sole authority
       resolve(db);
     };
 

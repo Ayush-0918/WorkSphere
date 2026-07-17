@@ -107,7 +107,14 @@ function getDB(): Promise<IDBDatabase> {
 }
 
 /**
- * Pushes a target action into the client IndexedDB transaction queue
+ * Pushes a target action into the client IndexedDB transaction queue.
+ *
+ * Key assignment is deliberately left to IndexedDB's built-in autoIncrement
+ * generator — do NOT supply an explicit `id` field.  A hand-crafted key based
+ * on Date.now() collides when two clicks arrive within the same millisecond
+ * (double-click), producing a ConstraintError on the second store.add() call.
+ * The autoIncrement counter is serialised by the IndexedDB engine and is
+ * guaranteed to be unique across concurrent transactions. (Issue #395)
  */
 export async function queueOfflineFavorite(
   venueId: string,
@@ -118,9 +125,8 @@ export async function queueOfflineFavorite(
     return new Promise((resolve, reject) => {
       const tx = db.transaction(STORE_NAME, "readwrite");
       const store = tx.objectStore(STORE_NAME);
-      const uniqueId = Date.now() * 1000 + Math.floor(Math.random() * 1000);
+      // No `id` field — let the autoIncrement keyPath assign a collision-free key.
       store.add({
-        id: uniqueId,
         venueId,
         action,
         timestamp: Date.now(),

@@ -184,6 +184,11 @@ export function VenueDetailDialog({
     setQuickSaveLoading(true);
     try {
       const res = await fetch("/api/folders");
+      if (!res.ok) {
+        alert("Failed to save venue. Unable to load collections.");
+        setQuickSaveLoading(false);
+        return;
+      }
       const data = await res.json();
       if (!data.folders || data.folders.length === 0) {
         alert(
@@ -201,13 +206,14 @@ export function VenueDetailDialog({
       });
 
       if (saveRes.ok) {
-        await fetch(
-          "http://127.0.0.1:1999/parties/main/folder-" + primaryFolder.id,
-          {
-            method: "POST",
-            body: JSON.stringify({ type: "refresh" }),
-          },
-        ).catch(() => {});
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 3000);
+        await fetch(`/api/folders/${primaryFolder.id}/refresh`, {
+          method: "POST",
+          signal: controller.signal,
+        })
+          .catch(() => {})
+          .finally(() => clearTimeout(timeoutId));
         alert(`Saved to ${primaryFolder.name}!`);
       } else {
         const errorData = await saveRes.json().catch(() => ({}));

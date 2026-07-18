@@ -1,9 +1,12 @@
 "use client";
 
+import Tesseract from "tesseract.js";
+
 import {
   X,
   MapPin,
   Wifi,
+  Loader2,
   Zap,
   Volume2,
   Navigation,
@@ -168,6 +171,75 @@ export function VenueDetailDialog({
   const [uploadingMenu, setUploadingMenu] = useState(false);
   const [previewPhoto, setPreviewPhoto] = useState<string | null>(null);
   const [wifiPredictions, setWifiPredictions] = useState<any[]>([]);
+
+  // Menu translation states
+  const [ocrCache, setOcrCache] = useState<Record<string, string>>({});
+  const [translationCache, setTranslationCache] = useState<
+    Record<string, string>
+  >({});
+  const [isExtracting, setIsExtracting] = useState(false);
+  const [isTranslating, setIsTranslating] = useState(false);
+  const [translatedMenuText, setTranslatedMenuText] = useState<string | null>(
+    null,
+  );
+  const [translationError, setTranslationError] = useState<string | null>(null);
+  const [selectedLanguage, setSelectedLanguage] = useState<string | null>(null);
+
+  const handleTranslateMenu = async (lang: string) => {
+    if (!previewPhoto) return;
+    setSelectedLanguage(lang);
+    setTranslationError(null);
+    setTranslatedMenuText(null);
+
+    const cacheKey = `${previewPhoto}-${lang}`;
+    if (translationCache[cacheKey]) {
+      setTranslatedMenuText(translationCache[cacheKey]);
+      return;
+    }
+
+    let extractedText = ocrCache[previewPhoto];
+    if (!extractedText) {
+      setIsExtracting(true);
+      try {
+        const {
+          data: { text },
+        } = await Tesseract.recognize(previewPhoto, "eng");
+        extractedText = text.trim();
+        setOcrCache((prev) => ({ ...prev, [previewPhoto]: extractedText }));
+      } catch (error) {
+        console.error("OCR Error:", error);
+        setTranslationError("Unable to extract readable text.");
+        setIsExtracting(false);
+        return;
+      }
+      setIsExtracting(false);
+    }
+
+    if (!extractedText) {
+      setTranslationError("No readable menu text found.");
+      return;
+    }
+
+    setIsTranslating(true);
+    try {
+      const response = await fetch("/api/menu-translate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: extractedText, targetLanguage: lang }),
+      });
+      if (!response.ok) throw new Error("Translation failed");
+      const data = await response.json();
+      setTranslatedMenuText(data.translatedText);
+      setTranslationCache((prev) => ({
+        ...prev,
+        [cacheKey]: data.translatedText,
+      }));
+    } catch (error) {
+      console.error("Translation API error:", error);
+      setTranslationError("Translation failed. Please try again.");
+    }
+    setIsTranslating(false);
+  };
 
   const _submitAmenityVote = async (
     amenityKey:
@@ -1440,18 +1512,104 @@ export function VenueDetailDialog({
       {previewPhoto && (
         <div
           className="fixed inset-0 z-[11000] flex items-center justify-center p-4 bg-black/90 animate-in fade-in duration-200"
-          onClick={() => setPreviewPhoto(null)}
+          onClick={() => {
+            setPreviewPhoto(null);
+            setTranslationError(null);
+            setTranslatedMenuText(null);
+          }}
         >
           <div
-            className="relative max-w-4xl max-h-[90vh] overflow-hidden rounded-2xl shadow-2xl border border-zinc-800"
+            className="relative max-w-4xl max-h-[90vh] overflow-hidden rounded-2xl shadow-2xl border border-zinc-800 flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
-            <button
-              onClick={() => setPreviewPhoto(null)}
-              className="absolute top-4 right-4 p-2 bg-black/60 hover:bg-black text-white rounded-full transition-all"
-            >
-              <X className="w-5 h-5" />
-            </button>
+            {/* Header controls for Menu Preview */}
+            <div className="absolute top-0 left-0 right-0 p-4 flex justify-between items-start z-10 bg-gradient-to-b from-black/80 to-transparent pointer-events-none">
+              <div className="pointer-events-auto">
+                {activeTab === "menu" && (
+                  <div className="relative inline-block text-left group/dropdown">
+                    <button className="flex items-center gap-2 px-3 py-1.5 bg-black/60 hover:bg-black/80 text-white rounded-lg transition-all text-sm font-medium backdrop-blur-md border border-white/10">
+                      <Globe2 className="w-4 h-4" />
+                      Translate Menu ▼
+                    </button>
+                    <div className="absolute left-0 mt-2 w-40 rounded-xl bg-zinc-900 border border-zinc-800 shadow-xl opacity-0 invisible group-hover/dropdown:opacity-100 group-hover/dropdown:visible transition-all duration-200 overflow-hidden">
+                      {["English", "Hindi", "French", "German", "Spanish"].map(
+                        (lang) => (
+                          <button
+                            key={lang}
+                            className="w-full text-left px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors"
+                            onClick={() => handleTranslateMenu(lang)}
+                          >
+                            {lang}
+                          </button>
+                        ),
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+              <button
+                onClick={() => {
+                  setPreviewPhoto(null);
+                  setTranslationError(null);
+                  setTranslatedMenuText(null);
+                }}
+                className="p-2 bg-black/60 hover:bg-black text-white rounded-full transition-all backdrop-blur-md border border-white/10 pointer-events-auto"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Status messages and translation result */}
+            <div className="absolute top-16 left-1/2 -translate-x-1/2 z-20 w-11/12 max-w-lg pointer-events-none">
+              {(isExtracting || isTranslating) && (
+                <div className="bg-zinc-900/95 backdrop-blur-md border border-blue-500/30 rounded-xl p-4 shadow-2xl animate-in slide-in-from-top-4 flex items-center justify-center gap-3">
+                  <Loader2 className="w-5 h-5 animate-spin text-blue-500" />
+                  <p className="text-sm font-medium text-zinc-200">
+                    {isExtracting
+                      ? "Extracting menu text..."
+                      : "Translating..."}
+                  </p>
+                </div>
+              )}
+
+              {translationError && (
+                <div className="bg-zinc-900/95 backdrop-blur-md border border-amber-500/30 rounded-xl p-4 shadow-2xl animate-in slide-in-from-top-4 flex items-start gap-3 pointer-events-auto">
+                  <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-zinc-200">
+                      {translationError}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setTranslationError(null)}
+                    className="p-1 hover:bg-white/10 rounded-lg transition-colors text-zinc-400 hover:text-zinc-200"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
+
+              {translatedMenuText && !isExtracting && !isTranslating && (
+                <div className="bg-zinc-900/95 backdrop-blur-md border border-zinc-700 rounded-xl p-4 shadow-2xl animate-in slide-in-from-top-4 pointer-events-auto max-h-[60vh] overflow-y-auto">
+                  <div className="flex items-center justify-between mb-3 pb-2 border-b border-zinc-800">
+                    <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                      <Globe2 className="w-4 h-4 text-blue-400" />
+                      Translated to {selectedLanguage}
+                    </h3>
+                    <button
+                      onClick={() => setTranslatedMenuText(null)}
+                      className="p-1 hover:bg-white/10 rounded-lg transition-colors text-zinc-400 hover:text-zinc-200"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                  <div className="text-sm text-zinc-300 whitespace-pre-wrap">
+                    {translatedMenuText}
+                  </div>
+                </div>
+              )}
+            </div>
+
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={previewPhoto}

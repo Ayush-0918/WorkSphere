@@ -515,45 +515,69 @@ async function notifyClientsOfPermanentFailure(action) {
 }
 
 async function syncFavoritesOutbox() {
-  try {
-    const actions = await getQueuedFavorites();
+  const processQueue = async () => {
+    try {
+      const actions = await getQueuedFavorites();
 
-    for (const action of actions) {
-      if (!action.id) continue;
+      for (const action of actions) {
+        if (!action.id) continue;
 
-      try {
-        const response = await fetch("/api/favorites", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            venueId: action.venueId,
-            action: action.action,
-          }),
-        });
+        try {
+          const response = await fetch("/api/favorites", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              venueId: action.venueId,
+              action: action.action,
+            }),
+          });
 
-        if (response.ok) {
-          // Remove from IndexedDB outbox queue on successful endpoint ingestion
-          await dequeueOfflineAction(action.id);
-          continue;
+          if (response.ok) {
+            // Remove from IndexedDB outbox queue on successful endpoint ingestion
+            await dequeueOfflineAction(action.id);
+            continue;
+          }
+
+          // Non-OK response (e.g. 500) counts as a failed attempt, same as a
+          // network-level throw below.
+          throw new Error(`Sync request failed with status ${response.status}`);
+        } catch (error) {
+          console.error("Failed to sync favorite:", error);
+
+          const attempts = await incrementRetryCount(action.id);
+
+          if (attempts !== null && attempts >= MAX_SYNC_RETRIES) {
+            // Give up after MAX_SYNC_RETRIES — but tell the user instead of
+            // purging the action silently.
+            await dequeueOfflineAction(action.id);
+            await notifyClientsOfPermanentFailure(action);
+          }
+          // Otherwise leave it queued; the next "sync-favorites" event (or the
+          // next reconnect) will retry it.
         }
-
-        // Non-OK response (e.g. 500) counts as a failed attempt, same as a
-        // network-level throw below.
-        throw new Error(`Sync request failed with status ${response.status}`);
-      } catch (error) {
-        console.error("Failed to sync favorite:", error);
-
-        const attempts = await incrementRetryCount(action.id);
-
-        if (attempts !== null && attempts >= MAX_SYNC_RETRIES) {
-          // Give up after MAX_SYNC_RETRIES — but tell the user instead of
-          // purging the action silently.
-          await dequeueOfflineAction(action.id);
-          await notifyClientsOfPermanentFailure(action);
-        }
-        // Otherwise leave it queued; the next "sync-favorites" event (or the
-        // next reconnect) will retry it.
       }
+    } catch (err) {
+      console.error("[SW] Error in processQueue:", err);
+    }
+  };
+
+  try {
+    if ("locks" in navigator) {
+      await navigator.locks.request(
+        "sync-favorites-queue",
+        { ifAvailable: true },
+        async (lock) => {
+          if (!lock) {
+            console.log(
+              "[SW] Queue is currently being processed by another agent. Skipping.",
+            );
+            return;
+          }
+          await processQueue();
+        },
+      );
+    } else {
+      await processQueue();
     }
   } catch (error) {
     console.error(

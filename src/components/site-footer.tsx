@@ -66,7 +66,7 @@ export default function SiteFooter() {
   ];
 
   return (
-    <footer className="relative z-10 border-t border-zinc-200/50 dark:border-white/5 bg-zinc-50/80 dark:bg-black/30 backdrop-blur-md py-16 text-zinc-600 dark:text-white/60">
+    <footer className="relative z-10 border-t border-zinc-200/50 dark:border-white/5 bg-zinc-50/80 dark:bg-black/30 backdrop-blur-md py-16 pb-28 sm:pb-16 text-zinc-600 dark:text-white/60">
       {/* Decorative ambient gradient backdrop */}
       <div className="absolute inset-0 -z-10 overflow-hidden pointer-events-none opacity-40 dark:opacity-100">
         <div className="absolute -bottom-10 left-1/4 w-[500px] h-[300px] rounded-full bg-blue-600/5 dark:bg-blue-600/10 blur-[80px]" />

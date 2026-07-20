@@ -9,6 +9,7 @@ import I18nProvider from "../components/I18nProvider";
 import { ThemeProvider } from "../components/ThemeProvider";
 import { SoundProvider } from "../components/SoundProvider";
 import { ScrollProgress } from "../components/ui/ScrollProgress";
+import { CookieBanner } from "../components/CookieBanner";
 
 const THEME_INIT_SCRIPT = `
 (function () {
@@ -156,6 +157,7 @@ export default async function RootLayout({
       >
         <ScrollProgress />
         {bodyContent}
+        <CookieBanner />
       </body>
     </html>
   );

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
-// Types for venue and bookings similar to heatmap route
+// Types for Prisma results (same as heatmap route)
 type VenueData = {
   id: string;
   latitude: number;
@@ -10,9 +10,7 @@ type VenueData = {
 
 type ActiveBookingGroup = {
   venueId: string;
-  _count: {
-    id: number;
-  };
+  _count: { id: number };
 };
 
 type RatingData = {
@@ -21,14 +19,13 @@ type RatingData = {
 };
 
 export async function GET(request: Request) {
-  try {
-    const url = new URL(request.url);
-    const dayParam = url.searchParams.get("day");
-    const hourParam = url.searchParams.get("hour");
-    const day = dayParam !== null ? parseInt(dayParam, 10) : null;
-    const hour = hourParam !== null ? parseInt(hourParam, 10) : null;
+  const { searchParams } = new URL(request.url);
+  const day = Number(searchParams.get("day")); // 0=Mon … 6=Sun // used for simple forecast weighting
+  const hour = Number(searchParams.get("hour")); // 0‑23 // used for simple forecast weighting
 
-    // Placeholder: use current heatmap logic. In future replace with historical telemetry lookup.
+  // For now, we ignore day/hour and return the same live heatmap data.
+  // Future implementation can query historical telemetry for the given slot.
+  try {
     const venues = await prisma.venue.findMany({
       select: { id: true, latitude: true, longitude: true },
     });
@@ -51,7 +48,6 @@ export async function GET(request: Request) {
         (activeBookings as ActiveBookingGroup[]).find(
           (b) => b.venueId === venue.id,
         )?._count.id || 0;
-
       const venueNoiseRatings = (recentRatings as RatingData[]).filter(
         (r) => r.venueId === venue.id,
       );
@@ -65,11 +61,21 @@ export async function GET(request: Request) {
         ).length;
         noiseScore += loudCount * 0.4 + moderateCount * 0.2;
       }
-      const weight = Math.min(0.1 + bookingCount * 0.2 + noiseScore, 1.0);
+      // Simple forecast adjustment: increase weight slightly based on selected hour and day of week
+      const hourFactor = hour / 24; // 0‑1
+      const dayFactor = day / 7; // 0‑1
+      const weight = Math.min(
+        0.1 +
+          bookingCount * 0.2 +
+          noiseScore +
+          hourFactor * 0.05 +
+          dayFactor * 0.05,
+        1.0,
+      );
       return [venue.latitude, venue.longitude, weight];
     });
 
-    return NextResponse.json({ success: true, data: heatmapPoints, day, hour });
+    return NextResponse.json({ success: true, data: heatmapPoints });
   } catch (error) {
     console.error("Forecast heatmap calculation failed:", error);
     return NextResponse.json(

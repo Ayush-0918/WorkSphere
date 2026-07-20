@@ -413,6 +413,15 @@ const Map = ({
   // Noise-level heatmap states (Issue #135)
   const [noiseHeatmapPoints, setNoiseHeatmapPoints] = useState<any[]>([]);
 
+  // Forecast heatmap UI state
+  const [selectedDay, setSelectedDay] = useState<number>(
+    // Monday=0, Sunday=6; map JS getDay (0=Sun) to our index
+    (new Date().getDay() + 6) % 7,
+  );
+  const [selectedHour, setSelectedHour] = useState<number>(
+    new Date().getHours(),
+  );
+
   // Green (<45dB) -> Yellow (45-65dB) -> Red (>65dB), banded rather than
   // blended so the zones read as distinct quiet/moderate/loud regions.
   const NOISE_GRADIENT = {

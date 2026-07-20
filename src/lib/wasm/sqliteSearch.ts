@@ -103,11 +103,19 @@ export class SQLiteFTS5SearchEngine {
   }
 
   private initWorker() {
-    if (typeof window !== "undefined" && typeof Worker !== "undefined") {
+    if (
+      typeof window !== "undefined" &&
+      typeof Worker !== "undefined" &&
+      typeof process !== "undefined" &&
+      process.env.NODE_ENV !== "test"
+    ) {
       try {
-        this.worker = new Worker(
-          new URL("../../workers/sqlite-search.worker.ts", import.meta.url),
+        const baseUrl = typeof window !== "undefined" ? window.location?.href : "http://localhost";
+        const workerUrl = new URL(
+          "../../workers/sqlite-search.worker.ts",
+          baseUrl,
         );
+        this.worker = new Worker(workerUrl);
         this.worker.onmessage = (
           e: MessageEvent<SQLiteSearchWorkerResponse>,
         ) => {

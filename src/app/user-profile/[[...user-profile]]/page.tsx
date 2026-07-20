@@ -20,19 +20,16 @@ export default function UserProfilePage() {
         </div>
 
         <div className="mb-8 max-w-[880px] mx-auto w-full space-y-8">
-        <div className="mb-8 max-w-[880px] mx-auto w-full">
           <CustomAvatarUpload />
           <PasskeyManager />
-        </div>
 
-        <div className="mb-8 max-w-[880px] mx-auto w-full">
           <div className="glass-card rounded-2xl p-6">
             <AccentPicker />
           </div>
-        </div>
 
-        <div className="flex justify-center">
-          <UserProfile path="/user-profile" routing="path" />
+          <div className="flex justify-center">
+            <UserProfile path="/user-profile" routing="path" />
+          </div>
         </div>
       </div>
     </div>

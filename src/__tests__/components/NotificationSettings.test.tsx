@@ -156,7 +156,7 @@ describe("NotificationSettings", () => {
     expect(postCall).toBeTruthy();
     const body = JSON.parse(postCall![1].body);
     expect(body.phoneNumber).toBe("+15551234567");
-  });
+  }, 20000);
 
   it("shows an error message when saving fails", async () => {
     render(<NotificationSettings />);

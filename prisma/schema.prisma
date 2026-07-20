@@ -614,6 +614,20 @@ model PasskeyCredential {
   aaguid       String?
   createdAt    DateTime @default(now())
   lastUsedAt   DateTime @default(now())
+
+  @@index([userId])
+}
+
+model PasskeyChallenge {
+  id        String   @id @default(cuid())
+  userId    String?
+  challenge String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([challenge])
+}
+
 model PushSubscription {
   id         String    @id @default(cuid())
   userId     String
@@ -628,14 +642,6 @@ model PushSubscription {
   @@index([userId])
 }
 
-model PasskeyChallenge {
-  id        String   @id @default(cuid())
-  userId    String?
-  challenge String   @unique
-  expiresAt DateTime
-  createdAt DateTime @default(now())
-
-  @@index([challenge])
 model PushNotificationLog {
   id        String   @id @default(cuid())
   userId    String

@@ -543,13 +543,27 @@ async function syncReceiptExports() {
 }
 
 // IndexedDB helpers
+let swDb = null;
 function openIndexedDB() {
+  if (swDb) return Promise.resolve(swDb);
   return new Promise((resolve, reject) => {
     try {
       const request = indexedDB.open("worksphere-offline", 5);
 
+      request.onblocked = () => {
+        console.warn("[SW] IndexedDB upgrade blocked");
+      };
+
       request.onerror = () => reject(request.error);
-      request.onsuccess = () => resolve(request.result);
+
+      request.onsuccess = () => {
+        swDb = request.result;
+        swDb.onversionchange = () => {
+          swDb.close();
+          swDb = null;
+        };
+        resolve(swDb);
+      };
 
       request.onupgradeneeded = (event) => {
         const db = event.target.result;

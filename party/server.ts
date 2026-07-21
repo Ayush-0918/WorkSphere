@@ -123,6 +123,23 @@ export default class WorkspaceServer implements Party.Server {
         return;
       }
 
+      if (
+        parsed.type === "request_room_snapshot" ||
+        parsed.type === "request_snapshot"
+      ) {
+        const snapshotId = parsed.snapshotId || `snap-${Date.now()}`;
+        sender.send(
+          JSON.stringify({
+            type: "room_snapshot_response",
+            roomId: this.room.id,
+            snapshotId,
+            timestamp: Date.now(),
+            seats: this.seatSummary(),
+          }),
+        );
+        return;
+      }
+
       // WebRTC signaling is allowed for VIEWERS, but `from` must match the
       // Clerk userId we verified on connect — never trust the client field alone.
       if (parsed.type === "webrtc-signal") {

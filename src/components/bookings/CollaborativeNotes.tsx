@@ -70,7 +70,7 @@ export function CollaborativeNotes({ roomId, placeholder = "Type meeting notes h
     const newValue = e.target.value;
     
     // Calculate the difference to only push deltas (changes) to the CRDT
-    ydocRef.current?.transact(() => {
+    yDocRef.current?.transact(() => {
       ytext.delete(0, ytext.length);
       ytext.insert(0, newValue);
     });

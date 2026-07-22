@@ -68,7 +68,10 @@ export class HeatDiffusionEngine {
   private running = false;
   private cpuGrid: Float32Array;
 
-  constructor(canvas: HTMLCanvasElement, config: HeatDiffusionConfig = {}) {
+  constructor(
+    canvas: HTMLCanvasElement,
+    config: Partial<HeatDiffusionConfig> = {},
+  ) {
     this.canvas = canvas;
     this.config = {
       width: config.width ?? DEFAULT_HEAT_GRID.width,
@@ -100,7 +103,7 @@ export class HeatDiffusionEngine {
       this.context = this.canvas.getContext("webgpu") as GPUCanvasContext | null;
       if (!this.context) return false;
 
-      this.format = navigator.gpu.getPreferredCanvasFormat();
+      this.format = navigator.gpu.getPreferredCanvasFormat() as any;
       this.context.configure({
         device: this.device,
         format: this.format,
@@ -130,8 +133,8 @@ export class HeatDiffusionEngine {
       size: tempBytes,
       usage: BufferUsage.STORAGE | BufferUsage.COPY_DST,
     });
-    this.device.queue.writeBuffer(this.tempBufferA, 0, this.cpuGrid);
-    this.device.queue.writeBuffer(this.tempBufferB, 0, this.cpuGrid);
+    this.device.queue.writeBuffer(this.tempBufferA!, 0, this.cpuGrid as unknown as BufferSource);
+    this.device.queue.writeBuffer(this.tempBufferB!, 0, this.cpuGrid as unknown as BufferSource);
 
     // HeatParams: 8 x f32/u32 = 32 bytes
     this.paramsBuffer = this.device.createBuffer({
@@ -153,14 +156,14 @@ export class HeatDiffusionEngine {
       usage: BufferUsage.UNIFORM | BufferUsage.COPY_DST,
     });
     this.device.queue.writeBuffer(
-      this.renderUniformBuffer,
+      this.renderUniformBuffer!,
       0,
       new Float32Array([
         this.config.minTemp,
         this.config.maxTemp,
         this.config.opacity,
         0,
-      ]),
+      ]) as unknown as BufferSource,
     );
 
     this.sizeBuffer = this.device.createBuffer({
@@ -168,9 +171,9 @@ export class HeatDiffusionEngine {
       usage: BufferUsage.UNIFORM | BufferUsage.COPY_DST,
     });
     this.device.queue.writeBuffer(
-      this.sizeBuffer,
+      this.sizeBuffer!,
       0,
-      new Uint32Array([this.config.width, this.config.height, 0, 0]),
+      new Uint32Array([this.config.width, this.config.height, 0, 0]) as unknown as BufferSource,
     );
   }
 

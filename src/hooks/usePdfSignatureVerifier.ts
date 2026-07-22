@@ -28,12 +28,18 @@ let workerInstance: Worker | null = null;
 let workerReady = false;
 let initPromise: Promise<void> | null = null;
 
-function getWorker(): Worker {
+function getWorker(): Worker | null {
+  if (typeof window === "undefined" || typeof Worker === "undefined") return null;
   if (!workerInstance) {
-    workerInstance = new Worker(
-      new URL("@/workers/pdfVerify.worker.ts", import.meta.url),
-      { type: "module" },
-    );
+    try {
+      const baseUrl = typeof document !== "undefined" ? document.baseURI : "http://localhost/";
+      workerInstance = new Worker(
+        new URL("/workers/pdfVerify.worker.ts", baseUrl),
+        { type: "module" },
+      );
+    } catch {
+      return null;
+    }
   }
   return workerInstance;
 }
@@ -44,6 +50,10 @@ async function initWorker(): Promise<void> {
 
   initPromise = new Promise<void>((resolve, reject) => {
     const worker = getWorker();
+    if (!worker) {
+      resolve();
+      return;
+    }
     const id = crypto.randomUUID();
 
     const handler = (e: MessageEvent<WorkerResponse>) => {
@@ -79,6 +89,10 @@ function verifyInWorker(
 ): Promise<SignatureVerificationResult> {
   return new Promise((resolve, reject) => {
     const worker = getWorker();
+    if (!worker) {
+      reject(new Error("Worker not supported"));
+      return;
+    }
     const id = crypto.randomUUID();
 
     const handler = (e: MessageEvent<WorkerResponse>) => {

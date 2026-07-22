@@ -42,7 +42,7 @@ beforeEach(async () => {
     arrayBuffer: () => Promise.resolve(wasmBuffer),
   });
 
-  HTMLCanvasElement.prototype.getContext = jest.fn(() => mockCtx);
+  HTMLCanvasElement.prototype.getContext = jest.fn((): any => mockCtx);
   Object.defineProperty(window, "devicePixelRatio", { value: 1, configurable: true });
 
   await resetEqualizer();

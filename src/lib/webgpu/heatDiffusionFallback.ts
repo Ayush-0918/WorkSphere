@@ -38,7 +38,10 @@ export class HeatDiffusionFallback {
   private raf = 0;
   private running = false;
 
-  constructor(canvas: HTMLCanvasElement, config: HeatDiffusionConfig = {}) {
+  constructor(
+    canvas: HTMLCanvasElement,
+    config: Partial<HeatDiffusionConfig> = {},
+  ) {
     this.canvas = canvas;
     this.config = {
       width: config.width ?? DEFAULT_HEAT_GRID.width,

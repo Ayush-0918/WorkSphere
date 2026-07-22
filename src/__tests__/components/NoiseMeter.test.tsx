@@ -207,7 +207,7 @@ describe("NoiseMeter Component & 60fps Audio Throttling", () => {
     mockGetUserMedia.mockResolvedValue(mockStream);
 
     global.navigator.mediaDevices.addEventListener = jest.fn((evt, cb) => {
-      if (evt === "devicechange") deviceChangeCb = cb;
+      if (evt === "devicechange") deviceChangeCb = cb as any;
     });
 
     const mockAudioContext = {

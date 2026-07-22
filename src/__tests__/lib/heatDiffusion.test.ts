@@ -23,8 +23,8 @@ describe("heatEquation", () => {
     const w = 8;
     const h = 8;
     const sensors = [{ x: 4, y: 4, temperature: 30 }];
-    let a = createAmbientGrid(w, h, 20, sensors);
-    let b = new Float32Array(a.length);
+    let a: Float32Array = createAmbientGrid(w, h, 20, sensors);
+    let b: Float32Array = new Float32Array(a.length);
 
     for (let i = 0; i < 40; i++) {
       stepHeatDiffusion(a, b, {

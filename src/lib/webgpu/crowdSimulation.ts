@@ -289,7 +289,7 @@ export class CrowdSimulationEngine {
       });
 
       await this.createBuffers();
-      await this.createPipelines(format);
+      await this.createPipelines(format as any);
 
       return true;
     } catch (error) {
@@ -315,7 +315,7 @@ export class CrowdSimulationEngine {
     });
 
     // Upload initial agent data
-    this.device.queue.writeBuffer(this.agentBufferA, 0, this.agents);
+    this.device.queue.writeBuffer(this.agentBufferA!, 0, this.agents as any);
 
     // Compute uniform buffer (18 * 4 = 72 bytes, padded to 80)
     this.computeUniformBuffer = this.device.createBuffer({
@@ -339,7 +339,7 @@ export class CrowdSimulationEngine {
       size: exitData.byteLength,
       usage: BufferUsage.STORAGE | BufferUsage.COPY_DST,
     });
-    this.device.queue.writeBuffer(this.exitBuffer, 0, exitData);
+    this.device.queue.writeBuffer(this.exitBuffer!, 0, exitData as any);
 
     // Wall segments buffer
     const wallData = new Float32Array(wallSegments.length * 4);
@@ -354,7 +354,7 @@ export class CrowdSimulationEngine {
       usage: BufferUsage.STORAGE | BufferUsage.COPY_DST,
     });
     if (wallData.byteLength > 0) {
-      this.device.queue.writeBuffer(this.wallBuffer, 0, wallData);
+      this.device.queue.writeBuffer(this.wallBuffer!, 0, wallData as any);
     }
 
     // Distance field texture
@@ -366,17 +366,22 @@ export class CrowdSimulationEngine {
       exitPositions,
     );
 
+    const textureUsage =
+      typeof GPUTextureUsage !== "undefined"
+        ? GPUTextureUsage
+        : { TEXTURE_BINDING: 0x0004, COPY_DST: 0x0002 };
+
     this.distanceTexture = this.device.createTexture({
       size: [GRID_SIZE, GRID_SIZE],
       format: "r32float",
-      usage: BufferUsage.TEXTURE_BINDING | BufferUsage.COPY_DST,
-    });
+      usage: textureUsage.TEXTURE_BINDING | textureUsage.COPY_DST,
+    })!;
 
     // Upload distance field data row by row
     for (let y = 0; y < GRID_SIZE; y++) {
       this.device.queue.writeTexture(
-        { texture: this.distanceTexture, origin: { x: 0, y } },
-        distField.subarray(y * GRID_SIZE, (y + 1) * GRID_SIZE),
+        { texture: this.distanceTexture!, origin: { x: 0, y } },
+        distField.subarray(y * GRID_SIZE, (y + 1) * GRID_SIZE) as any,
         { bytesPerRow: GRID_SIZE * 4 },
         { width: GRID_SIZE, height: 1 },
       );
@@ -392,13 +397,13 @@ export class CrowdSimulationEngine {
       size: AGENT_VERTICES.byteLength,
       usage: BufferUsage.VERTEX | BufferUsage.COPY_DST,
     });
-    this.device.queue.writeBuffer(this.agentVertexBuffer, 0, AGENT_VERTICES);
+    this.device.queue.writeBuffer(this.agentVertexBuffer!, 0, AGENT_VERTICES as unknown as BufferSource);
 
     this.agentIndexBuffer = this.device.createBuffer({
       size: AGENT_INDICES.byteLength,
       usage: BufferUsage.INDEX | BufferUsage.COPY_DST,
     });
-    this.device.queue.writeBuffer(this.agentIndexBuffer, 0, AGENT_INDICES);
+    this.device.queue.writeBuffer(this.agentIndexBuffer!, 0, AGENT_INDICES as unknown as BufferSource);
   }
 
   private async createPipelines(format: GPUTextureFormat): Promise<void> {
@@ -552,7 +557,7 @@ export class CrowdSimulationEngine {
     });
 
     // Render bind groups (read from whichever buffer is current)
-    const renderBindGroupLayout = this.renderPipeline.getBindGroupLayout(0);
+    const renderBindGroupLayout = this.renderPipeline!.getBindGroupLayout(0);
 
     this.renderBindGroupA = this.device.createBindGroup({
       layout: renderBindGroupLayout,
@@ -870,7 +875,7 @@ export class CrowdSimulationEngine {
   reset(): void {
     this.spawnAgents();
     if (this.device && this.agentBufferA) {
-      this.device.queue.writeBuffer(this.agentBufferA, 0, this.agents);
+      this.device.queue.writeBuffer(this.agentBufferA, 0, this.agents as any);
     }
     this.currentReadBuffer = 0;
     this.time = 0;

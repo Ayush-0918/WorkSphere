@@ -25,8 +25,9 @@ export async function loadPdfVerifyModule(): Promise<PdfVerifyModule> {
 
   loadingPromise = (async () => {
     try {
+      // @ts-ignore
       const factoryModule = await import(
-        /* webpackIgnore: true */ "/pdf-verify.js"
+        /* webpackIgnore: true */ ("/pdf-verify.js" as any)
       );
       const factory = factoryModule.default || factoryModule;
 

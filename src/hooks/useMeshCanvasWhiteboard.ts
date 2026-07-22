@@ -92,9 +92,11 @@ export function useMeshCanvasWhiteboard(
   useEffect(() => {
     if (!canvasId) return;
 
-    getToken()
-      .then((t) => setToken(t ?? null))
-      .catch(() => setToken(null));
+    if (typeof getToken === "function") {
+      getToken()
+        .then((t) => setToken(t ?? null))
+        .catch(() => setToken(null));
+    }
   }, [canvasId, getToken]);
 
   useEffect(() => {

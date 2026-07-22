@@ -32,8 +32,8 @@ export async function verifyPackedAttestation(
     const valid = await crypto.subtle.verify(
       { name: "RSASSA-PKCS1-v1_5" },
       publicKey,
-      attStmtSig,
-      toBeSigned,
+      attStmtSig as unknown as BufferSource,
+      toBeSigned as unknown as BufferSource,
     );
 
     return {
@@ -67,8 +67,8 @@ export async function verifyAndroidKeyAttestation(
   const valid = await crypto.subtle.verify(
     { name: "RSASSA-PKCS1-v1_5" },
     publicKey,
-    attStmtSig,
-    toVerify,
+    attStmtSig as unknown as BufferSource,
+    toVerify as unknown as BufferSource,
   );
 
   return {

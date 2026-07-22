@@ -7,7 +7,8 @@ import { AVATAR_UPDATED_EVENT } from "@/lib/avatar-events";
 type ReactiveUserButtonProps = ComponentProps<typeof UserButton>;
 
 export function ReactiveUserButton(props: ReactiveUserButtonProps) {
-  const { user } = useUser();
+  const userState = typeof useUser === "function" ? useUser() : null;
+  const user = userState?.user;
   const [avatarRevision, setAvatarRevision] = useState(0);
 
   useEffect(() => {

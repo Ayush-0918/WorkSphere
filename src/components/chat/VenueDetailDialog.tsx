@@ -49,6 +49,7 @@ import { useTranslation } from "react-i18next";
 import { Venue } from "./ChatMessages";
 import { RatingDistribution } from "./RatingDistribution";
 import { NoiseReportingWidget } from "@/components/noise/NoiseReportingWidget";
+import { AudioEqualizer } from "@/components/audio/AudioEqualizer";
 
 interface VenueDetailDialogProps {
   venue: Venue | null;
@@ -1403,6 +1404,8 @@ export function VenueDetailDialog({
               )}
 
               <div className="space-y-6 mt-6">
+                <AudioEqualizer venueName={venue.name} />
+
                 <div className="accent-bg-10 p-5 rounded-2xl border accent-border-30">
                   <h3 className="text-xs font-black uppercase tracking-widest accent-text mb-2 flex items-center gap-2">
                     <Info className="w-4 h-4" />

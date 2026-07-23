@@ -29,11 +29,11 @@ const nextConfig: NextConfig = {
           {
             key: "Content-Security-Policy",
             value:
-              "default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' images.unsplash.com res.cloudinary.com data:; connect-src 'self' *.partykit.io https://router.project-osrm.org; frame-ancestors 'none';",
+              "default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline' https://*.clerk.accounts.dev; style-src 'self' 'unsafe-inline'; img-src 'self' images.unsplash.com source.unsplash.com res.cloudinary.com https://img.clerk.com data: blob:; connect-src 'self' *.partykit.io wss://*.partykit.io https://router.project-osrm.org https://*.clerk.accounts.dev https://vitals.vercel-insights.com; worker-src 'self' blob:; frame-ancestors 'self';",
           },
           {
             key: "X-Frame-Options",
-            value: "DENY",
+            value: "SAMEORIGIN",
           },
           {
             key: "X-Content-Type-Options",
@@ -49,7 +49,7 @@ const nextConfig: NextConfig = {
           },
           {
             key: "Permissions-Policy",
-            value: "camera=(), microphone=(), geolocation=(self)",
+            value: "camera=(self), microphone=(self), geolocation=(self)",
           },
         ],
       },

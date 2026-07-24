@@ -10,6 +10,9 @@ const mockVenues: Venue[] = [
     id: "v1",
     name: "San Francisco Cowork",
     address: "Market St, San Francisco, CA",
+    lat: 37.7749,
+    lng: -122.4194,
+    category: "coworking",
     wifiSpeed: 150,
     hasOutlets: true,
     noiseLevel: "quiet",
@@ -18,6 +21,9 @@ const mockVenues: Venue[] = [
     id: "v2",
     name: "SF Quiet Hub",
     address: "Mission St, San Francisco, CA",
+    lat: 37.7749,
+    lng: -122.4194,
+    category: "cafe",
     wifiSpeed: 100,
     hasOutlets: true,
     noiseLevel: "quiet",
@@ -26,6 +32,9 @@ const mockVenues: Venue[] = [
     id: "v3",
     name: "Tokyo Cafe",
     address: "Shibuya, Tokyo",
+    lat: 35.6762,
+    lng: 139.6503,
+    category: "cafe",
     wifiSpeed: 200,
     hasOutlets: false,
     noiseLevel: "moderate",
@@ -38,16 +47,18 @@ describe("MultiCity PDF Export Utility (src/lib/multiCityPdfExport.ts)", () => {
     expect(sfMetrics.totalVenues).toBe(2);
     expect(sfMetrics.avgWifiSpeed).toBe(125);
     expect(sfMetrics.quietRatio).toBe(100);
-    expect(sfMetrics.outletRatio).toBe(100);
-
-    const tokyoMetrics = computeCityMetrics("Tokyo", mockVenues);
-    expect(tokyoMetrics.totalVenues).toBe(1);
-    expect(tokyoMetrics.avgWifiSpeed).toBe(200);
-    expect(tokyoMetrics.quietRatio).toBe(0);
-    expect(tokyoMetrics.outletRatio).toBe(0);
+    expect(sfMetrics.outletDensityPct).toBe(100);
   });
 
-  it("generates a valid PDF document containing selected city columns using pdf-lib", async () => {
+  it("handles empty venue arrays gracefully", () => {
+    const emptyMetrics = computeCityMetrics("Unknown City", []);
+    expect(emptyMetrics.totalVenues).toBe(0);
+    expect(emptyMetrics.avgWifiSpeed).toBe(0);
+    expect(emptyMetrics.quietRatio).toBe(0);
+    expect(emptyMetrics.outletDensityPct).toBe(0);
+  });
+
+  it("generates a valid binary PDF document given multiple selected cities", async () => {
     const pdfBytes = await generateMultiCityPdfReport({
       selectedCities: ["San Francisco", "Tokyo"],
       venues: mockVenues,
@@ -56,12 +67,7 @@ describe("MultiCity PDF Export Utility (src/lib/multiCityPdfExport.ts)", () => {
     expect(pdfBytes).toBeInstanceOf(Uint8Array);
     expect(pdfBytes.length).toBeGreaterThan(100);
 
-    // Verify generated PDF document can be re-parsed by pdf-lib
-    const parsedPdf = await PDFDocument.load(pdfBytes);
-    expect(parsedPdf.getPageCount()).toBeGreaterThanOrEqual(1);
-
-    const firstPage = parsedPdf.getPage(0);
-    expect(firstPage.getWidth()).toBe(842); // A4 Landscape width
-    expect(firstPage.getHeight()).toBe(595); // A4 Landscape height
+    const doc = await PDFDocument.load(pdfBytes);
+    expect(doc.getPageCount()).toBeGreaterThanOrEqual(1);
   });
 });

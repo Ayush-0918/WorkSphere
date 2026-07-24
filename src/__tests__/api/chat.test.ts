@@ -1,11 +1,11 @@
+import { POST } from "@/app/api/chat/route";
 import {
-  POST,
   orchestratorAgent,
   contextAgent,
   dataAgent,
   reasoningAgent,
   actionAgent,
-} from "@/app/api/chat/route";
+} from "@/lib/ai/chatAgents";
 import { auth } from "@clerk/nextjs/server";
 import { rateLimit, getRateLimitInfo } from "@/lib/rateLimit";
 import { prisma } from "@/lib/prisma";

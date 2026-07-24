@@ -8,6 +8,7 @@ export interface CityMetricSummary {
   avgWifiSpeed: number | null;
   quietRatio: number;
   outletRatio: number;
+  outletDensityPct: number;
   venues: Venue[];
 }
 
@@ -30,6 +31,11 @@ export function computeCityMetrics(
   const outletCount = cityVenues.filter((v) => v.hasOutlets).length;
   const quietCount = cityVenues.filter((v) => v.noiseLevel === "quiet").length;
 
+  const outletRatio =
+    cityVenues.length > 0
+      ? Math.round((outletCount / cityVenues.length) * 100)
+      : 0;
+
   return {
     city,
     totalVenues: cityVenues.length,
@@ -38,10 +44,8 @@ export function computeCityMetrics(
       cityVenues.length > 0
         ? Math.round((quietCount / cityVenues.length) * 100)
         : 0,
-    outletRatio:
-      cityVenues.length > 0
-        ? Math.round((outletCount / cityVenues.length) * 100)
-        : 0,
+    outletRatio,
+    outletDensityPct: outletRatio,
     venues: cityVenues,
   };
 }

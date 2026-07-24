@@ -97,8 +97,7 @@ describe("EXIF Orientation Parser (src/lib/exifOrientation.ts)", () => {
       drawImage: jest.fn(),
     };
 
-    // @ts-expect-error test mock
-    document.createElement = (tagName: string) => {
+    (document.createElement as any) = (tagName: string) => {
       if (tagName === "canvas") {
         return {
           width: 0,

@@ -1,46 +1,43 @@
-"use client";
+import { useCallback, useEffect, useRef, useState } from "react";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+export type SpeedOption = number;
+export const SPEED_OPTIONS: SpeedOption[] = [0.75, 1, 1.25, 1.5, 1.75, 2];
 
-export const SPEED_OPTIONS = [0.75, 1, 1.25, 1.5, 1.75, 2] as const;
-export type SpeedOption = (typeof SPEED_OPTIONS)[number];
+const VOICE_STORAGE_KEY = "worksphere_selected_voice_uri";
 
-const VOICE_STORAGE_KEY = "speechSynthesis:selectedVoiceURI";
-
-function getPersistedVoiceURI(): string | null {
+export function getPersistedVoiceURI(): string | null {
   if (typeof window === "undefined") return null;
   try {
-    return window.localStorage.getItem(VOICE_STORAGE_KEY);
+    return localStorage.getItem(VOICE_STORAGE_KEY);
   } catch {
     return null;
   }
 }
 
-function persistVoiceURI(uri: string | null) {
+export function persistVoiceURI(uri: string | null): void {
   if (typeof window === "undefined") return;
   try {
     if (uri) {
-      window.localStorage.setItem(VOICE_STORAGE_KEY, uri);
+      localStorage.setItem(VOICE_STORAGE_KEY, uri);
     } else {
-      window.localStorage.removeItem(VOICE_STORAGE_KEY);
+      localStorage.removeItem(VOICE_STORAGE_KEY);
     }
   } catch {
-    // localStorage unavailable (private mode etc.) — ignore
+    // Ignore storage errors
   }
 }
 
 export function splitTextIntoSentences(text: string): string[] {
   if (!text) return [];
-  const cleanText = text
-    .replace(/<ui-component\s+name="[^"]+"\s+props='[^']+'\s*\/>/g, "")
-    .trim();
-  if (!cleanText) return [];
-
-  const sentences = cleanText.split(/(?<=[!?])\s+|(?<=(?<!\b\d+)\.)\s+/g);
-  return sentences.length > 0 ? sentences : [cleanText];
+  // Split on sentence boundaries (. ! ?) while preserving reasonable chunks
+  const raw = text.split(/(?<=[.!?])\s+/);
+  return raw
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
 }
 
 export interface UseSpeechSynthesisOptions {
+  textToSpeakDefault?: string;
   defaultRate?: number;
   defaultPitch?: number;
   lang?: string;
@@ -55,27 +52,33 @@ export interface UseSpeechSynthesisReturn {
   isPaused: boolean;
   rate: number;
   pitch: number;
-  voice: SpeechSynthesisVoice | null;
   voices: SpeechSynthesisVoice[];
+  voice: SpeechSynthesisVoice | null;
   error: string | null;
   speakingMessageId: string | null;
   speakingSentenceIndex: number | null;
-  speak: (textToSpeak?: string) => void;
+  speak: (textOverride?: string) => void;
   speakMessage: (messageId: string, text: string) => void;
-  stopSpeech: () => void;
   cancel: () => void;
+  stopSpeech: () => void;
   pause: () => void;
   resume: () => void;
-  setRate: (newRate: number) => void;
-  setPitch: (newPitch: number) => void;
-  setVoice: (newVoice: SpeechSynthesisVoice | null) => void;
+  setRate: (rate: number) => void;
+  setPitch: (pitch: number) => void;
+  setVoice: (voice: SpeechSynthesisVoice | null) => void;
 }
 
 export function useSpeechSynthesis(
-  textToSpeakDefault: string = "",
-  options: UseSpeechSynthesisOptions = {},
+  textToSpeakDefaultOrOptions?: string | UseSpeechSynthesisOptions,
+  optionsParam?: UseSpeechSynthesisOptions,
 ): UseSpeechSynthesisReturn {
+  const options: UseSpeechSynthesisOptions =
+    typeof textToSpeakDefaultOrOptions === "string"
+      ? { textToSpeakDefault: textToSpeakDefaultOrOptions, ...optionsParam }
+      : (textToSpeakDefaultOrOptions || {});
+
   const {
+    textToSpeakDefault = "",
     defaultRate = 1,
     defaultPitch = 1,
     lang = "en-US",
@@ -89,14 +92,14 @@ export function useSpeechSynthesis(
   const [isPaused, setIsPaused] = useState(false);
   const [rate, setRateState] = useState(defaultRate);
   const [pitch, setPitchState] = useState(defaultPitch);
-  const [voices, setVoices] = useState([]);
-  const [voice, setVoiceState] = useState(null);
-  const [error, setError] = useState(null);
-  const [speakingMessageId, setSpeakingMessageId] = useState(null);
-  const [speakingSentenceIndex, setSpeakingSentenceIndex] = useState(null);
+  const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
+  const [voice, setVoiceState] = useState<SpeechSynthesisVoice | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [speakingMessageId, setSpeakingMessageId] = useState<string | null>(null);
+  const [speakingSentenceIndex, setSpeakingSentenceIndex] = useState<number | null>(null);
 
-  const utteranceRef = useRef(null);
-  const utterancesRef = useRef([]);
+  const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const utterancesRef = useRef<SpeechSynthesisUtterance[]>([]);
   const currentTextRef = useRef(textToSpeakDefault);
   const selectedVoiceURIRef = useRef(getPersistedVoiceURI());
 
@@ -149,7 +152,7 @@ export function useSpeechSynthesis(
     }
   }, [lang]);
 
-  const setVoice = useCallback((newVoice) => {
+  const setVoice = useCallback((newVoice: SpeechSynthesisVoice | null) => {
     selectedVoiceURIRef.current = newVoice ? newVoice.voiceURI : null;
     persistVoiceURI(selectedVoiceURIRef.current);
     setVoiceState(newVoice);
@@ -195,7 +198,7 @@ export function useSpeechSynthesis(
   }, []);
 
   const speak = useCallback(
-    (textOverride) => {
+    (textOverride?: string) => {
       if (typeof window === "undefined" || !("speechSynthesis" in window)) {
         setError("Speech synthesis is not supported in this environment.");
         return;
@@ -254,7 +257,7 @@ export function useSpeechSynthesis(
   );
 
   const speakMessage = useCallback(
-    (messageId, text) => {
+    (messageId: string, text: string) => {
       stopSpeech();
 
       if (typeof window === "undefined" || !("speechSynthesis" in window)) {
@@ -264,7 +267,7 @@ export function useSpeechSynthesis(
       const sentences = splitTextIntoSentences(text);
       if (sentences.length === 0) return;
 
-      const utterances = [];
+      const utterances: SpeechSynthesisUtterance[] = [];
       const resolvedVoice = resolveVoice();
 
       sentences.forEach((sentenceText, idx) => {
@@ -306,18 +309,18 @@ export function useSpeechSynthesis(
   );
 
   const setRate = useCallback(
-    (newRate) => {
+    (newRate: number) => {
       const clampedRate = Math.max(0.75, Math.min(2, newRate));
       setRateState(clampedRate);
 
       if (isSpeaking) {
-        speak();
+        speak(currentTextRef.current);
       }
     },
     [isSpeaking, speak],
   );
 
-  const setPitch = useCallback((newPitch) => {
+  const setPitch = useCallback((newPitch: number) => {
     const clampedPitch = Math.max(0, Math.min(2, newPitch));
     setPitchState(clampedPitch);
   }, []);
@@ -336,15 +339,15 @@ export function useSpeechSynthesis(
     isPaused,
     rate,
     pitch,
-    voice,
     voices,
+    voice,
     error,
     speakingMessageId,
     speakingSentenceIndex,
     speak,
     speakMessage,
-    stopSpeech,
     cancel,
+    stopSpeech,
     pause,
     resume,
     setRate,

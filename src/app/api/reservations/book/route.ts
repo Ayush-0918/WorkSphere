@@ -45,8 +45,6 @@ export async function POST(request: NextRequest) {
     seatIds = [body.seatId];
   }
 
-  // Sort seat IDs deterministically before acquiring FOR UPDATE row locks
-  // Enforce strict ascending locking order across concurrent requests
   const uniqueSeatIds = Array.from(new Set(seatIds)).sort();
 
   const date = typeof body.date === "string" ? body.date : "";
@@ -84,79 +82,20 @@ export async function POST(request: NextRequest) {
   const MAX_RETRIES = 3;
   let attempt = 0;
 
-  const confirmationId = `WS-#${Math.floor(100000 + Math.random() * 900000)}`;
-
-  let booking: Awaited<ReturnType<typeof prisma.booking.create>> | null = null;
-
-  try {
-    booking = await prisma.$transaction(async (tx) => {
-      const existingBookings = await tx.booking.findMany({
-        where: {
-          seatId,
-          date,
-          status: {
-            in: ["CONFIRMED", "PENDING"],
+  while (attempt <= MAX_RETRIES) {
+    try {
+      const result = await prisma.$transaction(async (tx) => {
+        const seats = await (tx as any).seat.findMany({
+          where: {
+            id: { in: uniqueSeatIds },
+            venueId,
           },
-        },
-        select: {
-          time: true,
-          duration: true,
-        },
-      });
-
-      const conflict = existingBookings.some((b) =>
-        overlaps(b.time, b.duration ?? 60, time, duration),
-      );
-
-      if (conflict) {
-        throw new Error("CONFLICT");
-      }
-
-      return tx.booking.create({
-        data: {
-          userId,
-          venueId,
-          seatId,
-          seatNumber: seat.seatNumber,
-          duration,
-          amenitiesNeeded,
-          date,
-          time,
-          customerEmail:
-            typeof body.customerEmail === "string"
-              ? body.customerEmail
-              : "guest@worksphere.local",
-          customerPhone:
-            typeof body.customerPhone === "string" ? body.customerPhone : null,
-          confirmationId,
-          status: "CONFIRMED",
-        },
-        include: {
-          venue: {
-            select: {
-              name: true,
-              address: true,
-            },
-          },
-          seat: true,
-        },
-      });
-    });
-  } catch (err) {
-    if ((err as Error).message === "CONFLICT") {
-      return NextResponse.json(
-        { error: "That seat was just reserved. Choose another seat." },
-        { status: 409 },
-      );
-    }
-    throw err;
-  }
+        });
 
         if (seats.length !== uniqueSeatIds.length) {
           throw new Error("SEAT_NOT_FOUND");
         }
 
-        // 3. Check existing bookings
         const existingBookings = await tx.booking.findMany({
           where: {
             seatId: { in: uniqueSeatIds },
@@ -172,7 +111,7 @@ export async function POST(request: NextRequest) {
         });
 
         const conflict = existingBookings.some(
-          (booking: { time: string; duration: any }) =>
+          (booking: { time: string; duration: number | null }) =>
             overlaps(booking.time, booking.duration ?? 60, time, duration),
         );
 
@@ -223,7 +162,6 @@ export async function POST(request: NextRequest) {
 
       const { createdBookings, confirmationId } = result;
 
-      // Create BookingGuest records if guests were provided
       if (guestEmails.length > 0) {
         try {
           await Promise.all(
@@ -247,14 +185,13 @@ export async function POST(request: NextRequest) {
         }
 
         for (const booking of createdBookings) {
-          // Emit booking:confirmed event so the guest subscriber picks them up
           await eventBus.emit("booking:confirmed", {
             bookingId: booking.id,
             confirmationId,
             venue: {
               id: venueId,
               name: booking.venue.name,
-              category: booking.venue.category || "workspace",
+              category: (booking.venue as any).category || "workspace",
               address: booking.venue.address || undefined,
             },
             customerEmail: body.customerEmail || "guest@worksphere.local",

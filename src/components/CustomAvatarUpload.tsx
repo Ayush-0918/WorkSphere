@@ -9,9 +9,7 @@ import {
   Upload,
 } from "lucide-react";
 import Image from "next/image";
-import { notifyAvatarUpdated } from "@/lib/avatar-events";
 import { normalizeImageOrientation } from "@/lib/exifOrientation";
-
 import { AvatarCropModal } from "@/components/AvatarCropModal";
 import { dispatchAvatarUpdated } from "@/lib/avatar-events";
 
@@ -140,19 +138,19 @@ export function CustomAvatarUpload() {
     }
   };
 
-    // Parse EXIF orientation tags and normalize image canvas matrix if needed
-    file = await normalizeImageOrientation(file);
-
-    const objectUrl = URL.createObjectURL(file);
-    setPreviewUrl(objectUrl);
-
+  const handleCroppedUpload = async (croppedFile: File) => {
     setError(null);
     setSuccess(null);
     setIsUploading(true);
 
     try {
+      if (!user) return;
+      const normalizedFile = await normalizeImageOrientation(croppedFile);
+      const objectUrl = URL.createObjectURL(normalizedFile);
+      setPreviewUrl(objectUrl);
+
       await user.setProfileImage({
-        file: croppedFile,
+        file: normalizedFile,
       });
       await user.reload();
 
@@ -163,7 +161,6 @@ export function CustomAvatarUpload() {
         if (currentSource) {
           URL.revokeObjectURL(currentSource);
         }
-
         return null;
       });
       setSelectedFileName("");
@@ -184,72 +181,74 @@ export function CustomAvatarUpload() {
     }
   };
 
-  const activeAvatarUrl = previewUrl || (user.hasImage ? user.imageUrl : null);
+  const activeAvatarUrl = previewUrl || (user?.hasImage ? user.imageUrl : null);
 
   return (
-    <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 shadow-sm">
-      <div className="flex items-start gap-4">
-        <div className="w-16 h-16 rounded-full overflow-hidden shrink-0 border border-zinc-200 dark:border-zinc-800 bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center">
-          {activeAvatarUrl ? (
-            <Image
-              src={activeAvatarUrl}
-              alt={user.fullName || "User avatar"}
-              width={64}
-              height={64}
-              className="w-full h-full object-cover"
-              style={{ imageOrientation: "from-image" }}
-              unoptimized
-            />
-          ) : (
-            <ImageIcon className="w-6 h-6 text-zinc-400" />
-          )}
-        </div>
-
-        <div className="flex-1">
-          <h3 className="text-lg font-semibold text-zinc-900 dark:text-white mb-1">
-            Profile Picture
-          </h3>
-          <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-4">
-            Upload a custom avatar to personalize your profile.
-          </p>
-
-          <div className="flex items-center gap-4">
-            <input
-              type="file"
-              accept="image/*"
-              className="hidden"
-              data-testid="file-input"
-              ref={fileInputRef}
-              onChange={handleFileChange}
-              disabled={isUploading}
-            />
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              disabled={isUploading}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 text-sm font-medium rounded-lg hover:bg-zinc-800 dark:hover:bg-zinc-100 disabled:opacity-50 transition-colors"
-            >
-              {isUploading ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Uploading...
-                </>
-              ) : (
-                <>
-                  <Upload className="w-4 h-4" />
-                  Upload Image
-                </>
-              )}
-            </button>
-            {error && <span className="text-sm text-red-500">{error}</span>}
-            {success && (
-              <p
-                className="mt-3 flex items-center gap-2 text-sm text-emerald-600 dark:text-emerald-400"
-                role="status"
-              >
-                <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
-                {success}
-              </p>
+    <div className="space-y-4">
+      <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 shadow-sm">
+        <div className="flex items-start gap-4">
+          <div className="w-16 h-16 rounded-full overflow-hidden shrink-0 border border-zinc-200 dark:border-zinc-800 bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center">
+            {activeAvatarUrl ? (
+              <Image
+                src={activeAvatarUrl}
+                alt={user?.fullName || "User avatar"}
+                width={64}
+                height={64}
+                className="w-full h-full object-cover"
+                style={{ imageOrientation: "from-image" }}
+                unoptimized
+              />
+            ) : (
+              <ImageIcon className="w-6 h-6 text-zinc-400" />
             )}
+          </div>
+
+          <div className="flex-1">
+            <h3 className="text-lg font-semibold text-zinc-900 dark:text-white mb-1">
+              Profile Picture
+            </h3>
+            <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-4">
+              Upload a custom avatar to personalize your profile.
+            </p>
+
+            <div className="flex items-center gap-4">
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                data-testid="file-input"
+                ref={fileInputRef}
+                onChange={handleFileChange}
+                disabled={isUploading || isPreparing}
+              />
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isUploading || isPreparing}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 text-sm font-medium rounded-lg hover:bg-zinc-800 dark:hover:bg-zinc-100 disabled:opacity-50 transition-colors"
+              >
+                {isUploading || isPreparing ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Uploading...
+                  </>
+                ) : (
+                  <>
+                    <Upload className="w-4 h-4" />
+                    Upload Image
+                  </>
+                )}
+              </button>
+              {error && <span className="text-sm text-red-500">{error}</span>}
+              {success && (
+                <p
+                  className="mt-3 flex items-center gap-2 text-sm text-emerald-600 dark:text-emerald-400"
+                  role="status"
+                >
+                  <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
+                  {success}
+                </p>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -262,6 +261,6 @@ export function CustomAvatarUpload() {
         onCancel={closeCropModal}
         onConfirm={handleCroppedUpload}
       />
-    </>
+    </div>
   );
 }

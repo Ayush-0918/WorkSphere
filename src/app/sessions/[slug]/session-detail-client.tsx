@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import ScreenSharePanel from "@/components/sessions/ScreenSharePanel";
 import Scratchpad from "@/components/sessions/Scratchpad";
+import { MeshCallGrid } from "@/components/audio/MeshCallGrid";
 import {
   generateSessionInviteToken,
   validateSessionInviteToken,

@@ -146,9 +146,13 @@ export class CrowdSimulationEngine {
   private context: GPUCanvasContext | null = null;
   private isDeviceLost = false;
 
+  // Dynamic Buffer Allocation Capacity Management
+  private allocatedCapacity = 10000;
+
   // Pipelines
   private computePipeline: GPURenderPipeline | null = null;
   private renderPipeline: GPURenderPipeline | null = null;
+  private computeBindGroupLayout: GPUBindGroupLayout | null = null;
 
   // Buffers (ping-pong)
   private agentBufferA: GPUBuffer | null = null;
@@ -214,6 +218,8 @@ export class CrowdSimulationEngine {
       agentScale: 0.15,
       ...config,
     };
+
+    this.allocatedCapacity = Math.max(config.agentCount, 10000);
 
     // Initialize agent data on CPU
     this.agents = new Float32Array(config.agentCount * 8); // 8 floats per agent
@@ -314,13 +320,179 @@ export class CrowdSimulationEngine {
     }
   }
 
+  public getAllocatedCapacity(): number {
+    return this.allocatedCapacity;
+  }
+
+  public getCapacityThreshold(): number {
+    return Math.floor(this.allocatedCapacity * 0.8);
+  }
+
+  public isReallocationNeeded(newAgentCount: number): boolean {
+    return newAgentCount >= this.allocatedCapacity * 0.8;
+  }
+
+  public async ensureCapacity(targetAgentCount: number): Promise<boolean> {
+    if (!this.isReallocationNeeded(targetAgentCount)) {
+      return true;
+    }
+    const newCapacity = Math.max(Math.ceil(targetAgentCount * 1.5), 10000);
+    return this.reallocateBuffers(newCapacity);
+  }
+
+  public async reallocateBuffers(newCapacity: number): Promise<boolean> {
+    this.allocatedCapacity = newCapacity;
+    if (!this.device) return true;
+
+    const agentSize = newCapacity * AGENT_STRIDE;
+    const maxBindingSize =
+      this.device.limits?.maxStorageBufferBindingSize || 134217728;
+    const maxBufferSize = this.device.limits?.maxBufferSize || 268435456;
+
+    if (agentSize > maxBindingSize || agentSize > maxBufferSize) {
+      console.warn(
+        `[CrowdSim] Reallocation size ${agentSize} bytes exceeds WebGPU limits`,
+      );
+      return false;
+    }
+
+    try {
+      const oldBufferA = this.agentBufferA;
+      const oldBufferB = this.agentBufferB;
+
+      this.agentBufferA = this.device.createBuffer({
+        size: agentSize,
+        usage:
+          BufferUsage.STORAGE | BufferUsage.COPY_SRC | BufferUsage.COPY_DST,
+      });
+      this.agentBufferB = this.device.createBuffer({
+        size: agentSize,
+        usage:
+          BufferUsage.STORAGE | BufferUsage.COPY_SRC | BufferUsage.COPY_DST,
+      });
+
+      this.device.queue.writeBuffer(this.agentBufferA, 0, this.agents as any);
+
+      this.recreateBindGroups();
+
+      oldBufferA?.destroy();
+      oldBufferB?.destroy();
+
+      this.allocatedCapacity = newCapacity;
+      return true;
+    } catch (err) {
+      console.error("[CrowdSim] Dynamic buffer reallocation failed:", err);
+      return false;
+    }
+  }
+
+  public async setAgentCount(newCount: number): Promise<boolean> {
+    const success = await this.ensureCapacity(newCount);
+    if (!success) return false;
+
+    const oldCount = this.config.agentCount;
+    const oldAgents = this.agents;
+    this.config.agentCount = newCount;
+    this.agents = new Float32Array(newCount * 8);
+
+    const copyCount = Math.min(oldAgents.length, this.agents.length);
+    this.agents.set(oldAgents.subarray(0, copyCount));
+
+    if (newCount > oldCount) {
+      this.spawnNewAgents(oldCount, newCount);
+    }
+
+    if (this.device && this.agentBufferA) {
+      this.device.queue.writeBuffer(this.agentBufferA, 0, this.agents as any);
+    }
+
+    return true;
+  }
+
+  private spawnNewAgents(startIndex: number, endIndex: number): void {
+    const { worldWidth, worldHeight, exitPositions } = this.config;
+    const data = this.agents;
+
+    for (let i = startIndex; i < endIndex; i++) {
+      const offset = i * 8;
+      let x: number, y: number;
+      do {
+        x = Math.random() * worldWidth * 0.8 + worldWidth * 0.1;
+        y = Math.random() * worldHeight * 0.8 + worldHeight * 0.1;
+      } while (
+        exitPositions.some(([ex, ey]) => Math.hypot(x - ex, y - ey) < 2)
+      );
+
+      data[offset + 0] = x;
+      data[offset + 1] = y;
+      data[offset + 2] = 0;
+      data[offset + 3] = 0;
+      data[offset + 4] = this.findNearestExit(x, y);
+      data[offset + 5] = 0;
+      data[offset + 6] = 0;
+      data[offset + 7] = 0;
+    }
+  }
+
+  private recreateBindGroups(): void {
+    if (!this.device || !this.computeBindGroupLayout || !this.renderPipeline)
+      return;
+
+    this.computeBindGroupA = this.device.createBindGroup({
+      layout: this.computeBindGroupLayout,
+      entries: [
+        { binding: 0, resource: { buffer: this.computeUniformBuffer! } },
+        { binding: 1, resource: { buffer: this.agentBufferA! } },
+        { binding: 2, resource: { buffer: this.agentBufferB! } },
+        { binding: 3, resource: { buffer: this.exitBuffer! } },
+        { binding: 4, resource: { buffer: this.wallBuffer! } },
+        { binding: 5, resource: this.distanceTexture!.createView() },
+        { binding: 6, resource: this.distanceSampler! },
+      ],
+    });
+
+    this.computeBindGroupB = this.device.createBindGroup({
+      layout: this.computeBindGroupLayout,
+      entries: [
+        { binding: 0, resource: { buffer: this.computeUniformBuffer! } },
+        { binding: 1, resource: { buffer: this.agentBufferB! } },
+        { binding: 2, resource: { buffer: this.agentBufferA! } },
+        { binding: 3, resource: { buffer: this.exitBuffer! } },
+        { binding: 4, resource: { buffer: this.wallBuffer! } },
+        { binding: 5, resource: this.distanceTexture!.createView() },
+        { binding: 6, resource: this.distanceSampler! },
+      ],
+    });
+
+    const renderBindGroupLayout = this.renderPipeline.getBindGroupLayout(0);
+
+    this.renderBindGroupA = this.device.createBindGroup({
+      layout: renderBindGroupLayout,
+      entries: [
+        { binding: 0, resource: { buffer: this.renderUniformBuffer! } },
+        { binding: 1, resource: { buffer: this.agentBufferA! } },
+      ],
+    });
+
+    this.renderBindGroupB = this.device.createBindGroup({
+      layout: renderBindGroupLayout,
+      entries: [
+        { binding: 0, resource: { buffer: this.renderUniformBuffer! } },
+        { binding: 1, resource: { buffer: this.agentBufferB! } },
+      ],
+    });
+
+    this.updateDensityBindGroup();
+  }
+
   private async createBuffers(): Promise<void> {
     if (!this.device) return;
 
-    const { agentCount, exitPositions, wallSegments } = this.config;
+    const { exitPositions, wallSegments } = this.config;
+    this.allocatedCapacity = Math.max(this.config.agentCount, 10000);
 
     // Validate memory limits
-    const agentSize = agentCount * AGENT_STRIDE;
+    const agentSize = this.allocatedCapacity * AGENT_STRIDE;
     const maxBindingSize =
       this.device.limits?.maxStorageBufferBindingSize || 134217728;
     const maxBufferSize = this.device.limits?.maxBufferSize || 268435456;
@@ -346,8 +518,6 @@ export class CrowdSimulationEngine {
 
     // Upload initial agent data
     this.device.queue.writeBuffer(this.agentBufferA!, 0, this.agents as any);
-
-    // Compute uniform buffer (18 * 4 = 72 bytes, padded to 80)
     this.computeUniformBuffer = this.device.createBuffer({
       size: 80,
       usage: BufferUsage.UNIFORM | BufferUsage.COPY_DST,
@@ -497,7 +667,7 @@ export class CrowdSimulationEngine {
       code: computeShader,
     });
 
-    const computeBindGroupLayout = this.device.createBindGroupLayout({
+    this.computeBindGroupLayout = this.device.createBindGroupLayout({
       entries: [
         {
           binding: 0,
@@ -1101,7 +1271,7 @@ export class CrowdSimulationEngine {
         p.worldWidth,
         p.worldHeight,
         0.92, // decay factor per frame (smooth trailing)
-        1.5,  // densityMultiplier
+        1.5, // densityMultiplier
         0,
       ]),
     );
